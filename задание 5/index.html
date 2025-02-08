@@ -1,15 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>To-Do List</title>
+    <meta charset="UTF-8">
+    <title>Todo List</title>
+    <style>
+        body { font-family: sans-serif; }
+        .task-list { list-style: none; padding: 0; }
+        .task-item { display: flex; align-items: center; margin-bottom: 5px; padding: 8px; border: 1px solid #ccc; }
+        .task-item.completed { background-color: #e0f7fa; text-decoration: line-through; }
+        .task-text { flex-grow: 1; margin-right: 10px; }
+        .task-buttons button { margin-right: 5px; }
+    </style>
 </head>
 <body>
-    <h1>To-Do List</h1>
-    <input type="text" id="newTaskInput" placeholder="Добавить задачу">
-    <button id="addTaskButton">Добавить</button>
-    <ul id="taskList">
-        <!-- Здесь будут задачи -->
+    <h1>Todo List</h1>
+
+    <form id="addTaskForm">
+        <input type="text" id="newTask" placeholder="Новая задача" required>
+        <button type="submit">Добавить</button>
+    </form>
+
+    <ul id="taskList" class="task-list">
     </ul>
-    <script src="script.js"></script>
+
+    <div id="taskCount">
+    </div>
+
+    <script>
+        const taskListElement = document.getElementById('taskList');
+        const addTaskForm = document.getElementById('addTaskForm');
+        const newTaskInput = document.getElementById('newTask');
+        const taskCountElement = document.getElementById('taskCount');
+
+        addTaskForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const taskText = newTaskInput.value.trim();
+            if (taskText) {
+                addTask(taskText);
+                newTaskInput.value = '';
+                loadTasks();
+            }
+        });
+
+        function addTask(taskText) {
+            fetch('actions.php?action=addTask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'task=' + encodeURIComponent(taskText)
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data !== 'success') {
+                    alert('Ошибка добавления задачи: ' + data);
+                }
+            });
+        }
+
+        function completeTask(index) {
+            fetch('actions.php?action=completeTask&index=' + index)
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    loadTasks();
+                } else {
+                    alert('Ошибка выполнения задачи: ' + data);
+                }
+            });
+        }
+
+        function deleteTask(index) {
+            fetch('actions.php?action=deleteTask&index=' + index)
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    loadTasks();
+                } else {
+                    alert('Ошибка удаления задачи: ' + data);
+                }
+            });
+        }
+
+        function editTask(index, currentText) {
+            const newTaskText = prompt("Редактировать задачу:", currentText);
+            if (newTaskText !== null && newTaskText.trim() !== "") {
+                fetch('actions.php?action=editTask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'index=' + index + '&newTaskText=' + encodeURIComponent(newTaskText)
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'success') {
+                        loadTasks();
+                    } else {
+                        alert('Ошибка редактирования задачи: ' + data);
+                    }
+                });
+            }
+        }
+
+
+        function loadTasks() {
+            fetch('actions.php?action=listTasks')
+            .then(response => response.json())
+            .then(tasks => {
+                taskListElement.innerHTML = '';
+                tasks.forEach((task, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('task-item');
+                    if (task.completed) {
+                        listItem.classList.add('completed');
+                    }
+
+                    listItem.innerHTML = `
+                        <span class="task-text">${task.text}</span>
+                        <div class="task-buttons">
+                            <button onclick="completeTask(${index})">Выполнить</button>
+                            <button onclick="editTask(${index}, '${task.text}')">Редактировать</button>
+                            <button onclick="deleteTask(${index})">Удалить</button>
+                        </div>
+                    `;
+                    taskListElement.appendChild(listItem);
+                });
+                updateTaskCount(tasks);
+            });
+        }
+
+        function updateTaskCount(tasks) {
+            let completedCount = 0;
+            tasks.forEach(task => {
+                if (task.completed) {
+                    completedCount++;
+                }
+            });
+            taskCountElement.textContent = `Выполнено задач: ${completedCount} из ${tasks.length}`;
+        }
+
+
+        loadTasks();
+    </script>
 </body>
 </html>
